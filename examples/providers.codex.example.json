@@ -1,0 +1,9 @@
+{
+  "providers": [
+    {
+      "name": "codex",
+      "type": "shell",
+      "command": "codex -a never exec --sandbox workspace-write --skip-git-repo-check --ephemeral \"Fix this issue: {issue}. Run tests with: {test_command}. Keep the patch minimal and do not modify tests.\""
+    }
+  ]
+}

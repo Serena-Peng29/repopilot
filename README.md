@@ -93,6 +93,18 @@ export REPOPILOT_MY_AGENT_COMMAND='my-agent --repo "{repo}" --issue {issue}'
 repopilot arena examples/eval_cases.jsonl --providers shell:my-agent
 ```
 
+Codex CLI 示例：
+
+```bash
+repopilot arena examples/eval_cases.jsonl \
+  --provider-config examples/providers.codex.example.json \
+  --output .repopilot/codex-arena.json \
+  --report .repopilot/codex-arena.md \
+  --html-report .repopilot/codex-arena.html
+```
+
+真实 coding agent 运行可能需要更长时间。可以在 case JSONL 里设置 `timeout_seconds`，先用单个 case 做 smoke test。
+
 支持的模板变量：
 
 - `{repo}`：当前 provider 的 workspace 路径
@@ -246,6 +258,18 @@ The shell provider can wrap any external command. The command runs inside a prov
 export REPOPILOT_MY_AGENT_COMMAND='my-agent --repo "{repo}" --issue {issue}'
 repopilot arena examples/eval_cases.jsonl --providers shell:my-agent
 ```
+
+Codex CLI example:
+
+```bash
+repopilot arena examples/eval_cases.jsonl \
+  --provider-config examples/providers.codex.example.json \
+  --output .repopilot/codex-arena.json \
+  --report .repopilot/codex-arena.md \
+  --html-report .repopilot/codex-arena.html
+```
+
+Real coding agents can take longer than deterministic demos. Set `timeout_seconds` in a case JSONL entry and start with one smoke-test case first.
 
 Supported template variables:
 
