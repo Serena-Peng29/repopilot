@@ -11,11 +11,11 @@ def test_arena_runs_demo_provider(tmp_path: Path) -> None:
 
     report = run_arena(Path("examples/eval_cases.jsonl"), ["demo"], settings)
 
-    assert report.total_cases == 2
+    assert report.total_cases == 8
     assert report.providers == ["demo"]
     assert report.summary is not None
-    assert report.summary.total_runs == 2
-    assert report.summary.passed == 2
+    assert report.summary.total_runs == 8
+    assert report.summary.passed == 8
     assert report.summary.pass_rate == 1
     case = report.cases[0]
     assert case.recommended_provider == "demo"
@@ -43,6 +43,7 @@ def test_markdown_report_includes_summary(tmp_path: Path) -> None:
     assert "| demo | native |" in markdown
     assert "sample-addition-bug" in markdown
     assert "sample-multiply-bug" in markdown
+    assert "sample-slugify-bug" in markdown
 
 
 def test_arena_runs_shell_provider(tmp_path: Path, monkeypatch) -> None:
@@ -79,7 +80,7 @@ def test_arena_runs_provider_config_demo(tmp_path: Path) -> None:
 
     assert report.providers == ["demo"]
     assert report.summary is not None
-    assert report.summary.passed == 2
+    assert report.summary.passed == 8
 
 
 def test_arena_runs_provider_config_shell(tmp_path: Path) -> None:

@@ -1,7 +1,85 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from repopilot.models import AgentAction, Message, ToolCall
 from repopilot.providers.base import AgentProvider
+
+
+@dataclass(frozen=True)
+class DemoRepair:
+    keywords: tuple[str, ...]
+    query: str
+    path: str
+    content: str
+
+
+REPAIRS = (
+    DemoRepair(
+        keywords=("multiply", "product"),
+        query="multiply",
+        path="calculator.py",
+        content="def multiply(a: int, b: int) -> int:\n    return a * b\n",
+    ),
+    DemoRepair(
+        keywords=("divide", "division"),
+        query="divide",
+        path="calculator.py",
+        content="def divide(a: float, b: float) -> float:\n    return a / b\n",
+    ),
+    DemoRepair(
+        keywords=("slugify", "hyphen", "whitespace"),
+        query="slugify",
+        path="text_utils.py",
+        content=(
+            "import re\n\n\n"
+            "def slugify(value: str) -> str:\n"
+            "    return re.sub(r\"-+\", \"-\", re.sub(r\"\\s+\", \"-\", value.strip().lower()))\n"
+        ),
+    ),
+    DemoRepair(
+        keywords=("csv", "comma-separated", "parse_csv_line"),
+        query="parse_csv_line",
+        path="parser.py",
+        content=(
+            "def parse_csv_line(line: str) -> list[str]:\n"
+            "    return [part.strip() for part in line.split(\",\")]\n"
+        ),
+    ),
+    DemoRepair(
+        keywords=("timeout", "default", "get_timeout"),
+        query="get_timeout",
+        path="config.py",
+        content="def get_timeout(config: dict) -> int:\n    return int(config.get(\"timeout\", 30))\n",
+    ),
+    DemoRepair(
+        keywords=("unique_items", "duplicates", "first-seen"),
+        query="unique_items",
+        path="collections_utils.py",
+        content=(
+            "def unique_items(items: list[str]) -> list[str]:\n"
+            "    seen = set()\n"
+            "    result: list[str] = []\n"
+            "    for item in items:\n"
+            "        if item not in seen:\n"
+            "            seen.add(item)\n"
+            "            result.append(item)\n"
+            "    return result\n"
+        ),
+    ),
+    DemoRepair(
+        keywords=("fahrenheit", "celsius", "temperature"),
+        query="celsius_to_fahrenheit",
+        path="temperature.py",
+        content="def celsius_to_fahrenheit(celsius: float) -> float:\n    return celsius * 9 / 5 + 32\n",
+    ),
+    DemoRepair(
+        keywords=("add", "addition"),
+        query="add",
+        path="calculator.py",
+        content="def add(a: int, b: int) -> int:\n    return a + b\n",
+    ),
+)
 
 
 class DemoProvider(AgentProvider):
@@ -12,13 +90,15 @@ class DemoProvider(AgentProvider):
 
     def __init__(self) -> None:
         self.step = 0
-        self.target = "add"
+        self.repair = REPAIRS[-1]
+        self._repair_locked = False
 
     def next_action(self, messages: list[Message]) -> AgentAction:
         self.step += 1
-        transcript = "\n".join(message.content for message in messages[-8:])
-        if "multiply" in transcript.lower() or "product" in transcript.lower():
-            self.target = "multiply"
+        transcript = "\n".join(message.content for message in messages[-8:]).lower()
+        if not self._repair_locked:
+            self.repair = _select_repair(transcript)
+            self._repair_locked = True
 
         if self.step == 1:
             return AgentAction(
@@ -26,36 +106,21 @@ class DemoProvider(AgentProvider):
                 tool_call=ToolCall(name="list_files"),
             )
         if self.step == 2:
-            query = "multiply" if self.target == "multiply" else "add"
             return AgentAction(
-                thought=f"Search for the relevant arithmetic function: {query}.",
-                tool_call=ToolCall(name="search", args={"query": query}),
+                thought=f"Search for the relevant implementation: {self.repair.query}.",
+                tool_call=ToolCall(name="search", args={"query": self.repair.query}),
             )
         if self.step == 3:
             return AgentAction(
                 thought="Read the likely implementation file before editing.",
-                tool_call=ToolCall(name="read_file", args={"path": "calculator.py"}),
+                tool_call=ToolCall(name="read_file", args={"path": self.repair.path}),
             )
-        if self.step == 4 and self.target == "multiply" and "return a + b" in transcript:
+        if self.step == 4:
             return AgentAction(
-                thought="The multiply function adds; replace it with multiplication.",
+                thought="Apply the deterministic demo repair for this sample case.",
                 tool_call=ToolCall(
                     name="write_file",
-                    args={
-                        "path": "calculator.py",
-                        "content": "def multiply(a: int, b: int) -> int:\n    return a * b\n",
-                    },
-                ),
-            )
-        if self.step == 4 and "return a - b" in transcript:
-            return AgentAction(
-                thought="The add function subtracts; replace it with addition.",
-                tool_call=ToolCall(
-                    name="write_file",
-                    args={
-                        "path": "calculator.py",
-                        "content": "def add(a: int, b: int) -> int:\n    return a + b\n",
-                    },
+                    args={"path": self.repair.path, "content": self.repair.content},
                 ),
             )
         if self.step == 5:
@@ -68,3 +133,10 @@ class DemoProvider(AgentProvider):
             thought="The repair loop has enough evidence to stop.",
             final_answer="Generated a patch and ran the configured verification command.",
         )
+
+
+def _select_repair(transcript: str) -> DemoRepair:
+    for repair in REPAIRS:
+        if any(keyword in transcript for keyword in repair.keywords):
+            return repair
+    return REPAIRS[-1]

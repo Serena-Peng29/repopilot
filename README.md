@@ -103,6 +103,8 @@ repopilot arena examples/eval_cases.jsonl --providers shell:my-agent
 
 `examples/eval_cases.jsonl` 中的每一行是一个 JSON object：
 
+仓库自带 8 个小型 deterministic sample cases，用于演示 arena、report 和 patch scoring。
+
 ```json
 {
   "id": "sample-addition-bug",
@@ -253,6 +255,8 @@ Supported template variables:
 ### Benchmark Case Format
 
 Each line in `examples/eval_cases.jsonl` is a JSON object:
+
+The repository includes 8 small deterministic sample cases for demonstrating the arena, reports, and patch scoring.
 
 ```json
 {
