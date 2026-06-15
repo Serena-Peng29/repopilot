@@ -1,0 +1,2 @@
+{"id":"sample-addition-bug","repo":"examples/sample_buggy_project","issue":"The add(a, b) function returns the wrong result for positive and negative numbers.","test_command":["python","-m","pytest","-q"],"expected_files":["calculator.py"]}
+{"id":"sample-multiply-bug","repo":"examples/sample_multiply_project","issue":"The multiply(a, b) function returns the wrong product for positive numbers and zero.","test_command":["python","-m","pytest","-q"],"expected_files":["calculator.py"]}
