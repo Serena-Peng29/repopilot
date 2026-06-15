@@ -6,16 +6,18 @@ from pathlib import Path
 from repopilot.agents.runner import RepoPilotRunner
 from repopilot.config import Settings
 from repopilot.eval.harness import load_cases
+from repopilot.eval.provider_config import provider_specs_from_names
 from repopilot.eval.scoring import score_patch
 from repopilot.models import (
     ArenaReport,
     ArenaSummary,
     CaseComparison,
     EvaluationCase,
+    ProviderSpec,
     ProviderRunResult,
     ProviderSummary,
 )
-from repopilot.providers import create_provider, is_shell_provider, shell_provider_name
+from repopilot.providers import create_provider
 from repopilot.providers.shell import ShellProvider
 from repopilot.runtime.repository import prepare_repository
 from repopilot.runtime.sandbox import Sandbox
@@ -23,8 +25,17 @@ from repopilot.trace import save_trace
 
 
 def run_arena(cases_path: Path, provider_names: list[str], settings: Settings) -> ArenaReport:
+    return run_arena_with_specs(cases_path, provider_specs_from_names(provider_names), settings)
+
+
+def run_arena_with_specs(
+    cases_path: Path,
+    provider_specs: list[ProviderSpec],
+    settings: Settings,
+) -> ArenaReport:
     cases = load_cases(cases_path)
-    comparisons = [_run_case(case, provider_names, settings) for case in cases]
+    comparisons = [_run_case(case, provider_specs, settings) for case in cases]
+    provider_names = [spec.name for spec in provider_specs]
     return ArenaReport(
         total_cases=len(cases),
         providers=provider_names,
@@ -33,8 +44,12 @@ def run_arena(cases_path: Path, provider_names: list[str], settings: Settings) -
     )
 
 
-def _run_case(case: EvaluationCase, provider_names: list[str], settings: Settings) -> CaseComparison:
-    results = [_run_provider(case, provider_name, settings) for provider_name in provider_names]
+def _run_case(
+    case: EvaluationCase,
+    provider_specs: list[ProviderSpec],
+    settings: Settings,
+) -> CaseComparison:
+    results = [_run_provider(case, provider_spec, settings) for provider_spec in provider_specs]
     recommended = _recommend(results)
 
     for result in results:
@@ -46,7 +61,12 @@ def _run_case(case: EvaluationCase, provider_names: list[str], settings: Setting
     return CaseComparison(case_id=case.id, recommended_provider=recommended, results=results)
 
 
-def _run_provider(case: EvaluationCase, provider_name: str, settings: Settings) -> ProviderRunResult:
+def _run_provider(
+    case: EvaluationCase,
+    provider_spec: ProviderSpec,
+    settings: Settings,
+) -> ProviderRunResult:
+    provider_name = provider_spec.name
     workspace = settings.workspace_dir / "arena" / case.id / provider_name
     traces_dir = settings.workspace_dir / "arena-traces" / case.id / provider_name
     patches_dir = settings.workspace_dir / "arena-patches" / case.id
@@ -63,11 +83,8 @@ def _run_provider(case: EvaluationCase, provider_name: str, settings: Settings) 
     patch_path: Path | None = None
     try:
         repo_path = prepare_repository(case.repo, workspace)
-        if is_shell_provider(provider_name):
-            provider = ShellProvider.from_env(
-                shell_provider_name(provider_name),
-                timeout_seconds=provider_settings.command_timeout_seconds,
-            )
+        if provider_spec.type == "shell":
+            provider = _create_shell_provider(provider_spec, provider_settings)
             trace = provider.run(repo_path, case)
             if trace.status == "patched":
                 verification = Sandbox(
@@ -78,6 +95,7 @@ def _run_provider(case: EvaluationCase, provider_name: str, settings: Settings) 
                 trace.status = "tests_passed" if verification.exit_code == 0 else "tests_failed"
             metadata = provider.metadata()
         else:
+            provider_settings = _settings_for_builtin(provider_spec, provider_settings)
             provider = create_provider(provider_settings)
             runner = RepoPilotRunner(provider, provider_settings)
             trace = runner.run(repo_path, case.issue, test_command=test_command)
@@ -175,3 +193,24 @@ def _summarize_provider(provider_name: str, results: list[ProviderRunResult]) ->
 def _average(values) -> float:
     collected = list(values)
     return sum(collected) / len(collected) if collected else 0
+
+
+def _create_shell_provider(provider_spec: ProviderSpec, settings: Settings) -> ShellProvider:
+    shell_name = provider_spec.provider or provider_spec.name.removeprefix("shell:")
+    if provider_spec.command:
+        return ShellProvider(
+            name=provider_spec.name,
+            command_template=provider_spec.command,
+            timeout_seconds=settings.command_timeout_seconds,
+        )
+    return ShellProvider.from_env(shell_name, timeout_seconds=settings.command_timeout_seconds)
+
+
+def _settings_for_builtin(provider_spec: ProviderSpec, settings: Settings) -> Settings:
+    return Settings(
+        workspace_dir=settings.workspace_dir,
+        model=provider_spec.model or settings.model,
+        max_iterations=settings.max_iterations,
+        command_timeout_seconds=settings.command_timeout_seconds,
+        provider=provider_spec.provider or provider_spec.name,
+    )

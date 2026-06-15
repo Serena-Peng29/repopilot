@@ -66,6 +66,18 @@ class EvaluationCase(BaseModel):
     timeout_seconds: int | None = None
 
 
+class ProviderSpec(BaseModel):
+    name: str
+    type: str = "builtin"
+    provider: str | None = None
+    command: str | None = None
+    model: str | None = None
+
+
+class ProviderConfig(BaseModel):
+    providers: list[ProviderSpec]
+
+
 class PatchScore(BaseModel):
     changed_files: int = 0
     additions: int = 0

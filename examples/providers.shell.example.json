@@ -1,0 +1,9 @@
+{
+  "providers": [
+    {
+      "name": "my-agent",
+      "type": "shell",
+      "command": "my-agent --repo \"{repo}\" --issue {issue}"
+    }
+  ]
+}

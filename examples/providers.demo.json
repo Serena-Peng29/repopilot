@@ -1,0 +1,9 @@
+{
+  "providers": [
+    {
+      "name": "demo",
+      "type": "builtin",
+      "provider": "demo"
+    }
+  ]
+}

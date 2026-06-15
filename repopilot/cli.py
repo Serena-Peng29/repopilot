@@ -10,8 +10,9 @@ from rich.table import Table
 
 from repopilot.agents.runner import RepoPilotRunner
 from repopilot.config import Settings
-from repopilot.eval.arena import run_arena
+from repopilot.eval.arena import run_arena, run_arena_with_specs
 from repopilot.eval.harness import run_evaluation
+from repopilot.eval.provider_config import load_provider_config
 from repopilot.eval.reporting import render_markdown_report
 from repopilot.providers import create_provider
 from repopilot.runtime.repository import prepare_repository
@@ -104,16 +105,22 @@ def eval(
 def arena(
     cases: Path = typer.Argument(..., help="JSONL evaluation file."),
     providers: str = typer.Option("demo", "--providers", help="Comma-separated provider names."),
+    provider_config: Path | None = typer.Option(None, "--provider-config", help="JSON provider config."),
     output: Path = typer.Option(Path(".repopilot/arena-report.json"), "--output", "-o"),
     markdown_report: Path | None = typer.Option(None, "--report", help="Write a Markdown report."),
 ) -> None:
     """Compare multiple providers on the same benchmark cases."""
-    provider_names = [provider.strip() for provider in providers.split(",") if provider.strip()]
-    if not provider_names:
-        raise typer.BadParameter("At least one provider is required.")
-
     settings = Settings.from_env()
-    report = run_arena(cases, provider_names, settings)
+    if provider_config:
+        provider_specs = load_provider_config(provider_config)
+        if not provider_specs:
+            raise typer.BadParameter("Provider config must include at least one provider.")
+        report = run_arena_with_specs(cases, provider_specs, settings)
+    else:
+        provider_names = [provider.strip() for provider in providers.split(",") if provider.strip()]
+        if not provider_names:
+            raise typer.BadParameter("At least one provider is required.")
+        report = run_arena(cases, provider_names, settings)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(report.model_dump_json(indent=2), encoding="utf-8")
     if markdown_report:
