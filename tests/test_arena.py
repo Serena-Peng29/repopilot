@@ -3,7 +3,7 @@ from pathlib import Path
 from repopilot.config import Settings
 from repopilot.eval.arena import run_arena, run_arena_with_specs
 from repopilot.eval.provider_config import load_provider_config
-from repopilot.eval.reporting import render_markdown_report
+from repopilot.eval.reporting import render_html_report, render_markdown_report
 
 
 def test_arena_runs_demo_provider(tmp_path: Path) -> None:
@@ -44,6 +44,20 @@ def test_markdown_report_includes_summary(tmp_path: Path) -> None:
     assert "sample-addition-bug" in markdown
     assert "sample-multiply-bug" in markdown
     assert "sample-slugify-bug" in markdown
+
+
+def test_html_report_includes_summary(tmp_path: Path) -> None:
+    settings = Settings(workspace_dir=tmp_path / "workspace", provider="demo", max_iterations=6)
+    report = run_arena(Path("examples/eval_cases.jsonl"), ["demo"], settings)
+
+    html = render_html_report(report)
+
+    assert "<!doctype html>" in html
+    assert "AgentPatchBench Arena Report" in html
+    assert "Pass Rate" in html
+    assert "100.0%" in html
+    assert "sample-addition-bug" in html
+    assert "demo details" in html
 
 
 def test_arena_runs_shell_provider(tmp_path: Path, monkeypatch) -> None:

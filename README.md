@@ -61,7 +61,8 @@ repopilot eval examples/eval_cases.jsonl --provider demo
 repopilot arena examples/eval_cases.jsonl \
   --providers demo \
   --output .repopilot/arena-report.json \
-  --report .repopilot/arena-report.md
+  --report .repopilot/arena-report.md \
+  --html-report .repopilot/arena-report.html
 ```
 
 也可以使用 provider config：
@@ -214,7 +215,8 @@ Run the multi-provider arena:
 repopilot arena examples/eval_cases.jsonl \
   --providers demo \
   --output .repopilot/arena-report.json \
-  --report .repopilot/arena-report.md
+  --report .repopilot/arena-report.md \
+  --html-report .repopilot/arena-report.html
 ```
 
 You can also use a provider config file:

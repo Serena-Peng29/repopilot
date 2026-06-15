@@ -13,7 +13,7 @@ from repopilot.config import Settings
 from repopilot.eval.arena import run_arena, run_arena_with_specs
 from repopilot.eval.harness import run_evaluation
 from repopilot.eval.provider_config import load_provider_config
-from repopilot.eval.reporting import render_markdown_report
+from repopilot.eval.reporting import render_html_report, render_markdown_report
 from repopilot.providers import create_provider
 from repopilot.runtime.repository import prepare_repository
 from repopilot.trace import save_trace
@@ -108,6 +108,7 @@ def arena(
     provider_config: Path | None = typer.Option(None, "--provider-config", help="JSON provider config."),
     output: Path = typer.Option(Path(".repopilot/arena-report.json"), "--output", "-o"),
     markdown_report: Path | None = typer.Option(None, "--report", help="Write a Markdown report."),
+    html_report: Path | None = typer.Option(None, "--html-report", help="Write a static HTML report."),
 ) -> None:
     """Compare multiple providers on the same benchmark cases."""
     settings = Settings.from_env()
@@ -126,6 +127,9 @@ def arena(
     if markdown_report:
         markdown_report.parent.mkdir(parents=True, exist_ok=True)
         markdown_report.write_text(render_markdown_report(report), encoding="utf-8")
+    if html_report:
+        html_report.parent.mkdir(parents=True, exist_ok=True)
+        html_report.write_text(render_html_report(report), encoding="utf-8")
 
     table = Table(title="AgentPatchBench Arena")
     table.add_column("Case")
@@ -166,6 +170,8 @@ def arena(
     console.print(f"Report: [cyan]{output}[/cyan]")
     if markdown_report:
         console.print(f"Markdown: [cyan]{markdown_report}[/cyan]")
+    if html_report:
+        console.print(f"HTML: [cyan]{html_report}[/cyan]")
 
 
 @app.command()
