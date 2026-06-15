@@ -33,6 +33,14 @@ pip install -e '.[dev,openai]'
 
 ### 快速开始
 
+启动交互式向导：
+
+```bash
+repopilot wizard
+```
+
+向导会询问 repository、issue、测试命令和 provider，并自动生成 JSON、Markdown 和 HTML 报告。
+
 运行本地 demo，不需要 API key：
 
 ```bash
@@ -198,6 +206,14 @@ pip install -e '.[dev,openai]'
 ```
 
 ### Quick Start
+
+Start the interactive wizard:
+
+```bash
+repopilot wizard
+```
+
+The wizard asks for a repository, issue, verification command, and provider, then generates JSON, Markdown, and HTML reports.
 
 Run the local demo without an API key:
 

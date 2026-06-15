@@ -6,6 +6,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 from rich.panel import Panel
+from rich.prompt import Confirm, IntPrompt, Prompt
 from rich.table import Table
 
 from repopilot.agents.runner import RepoPilotRunner
@@ -17,9 +18,12 @@ from repopilot.eval.reporting import render_html_report, render_markdown_report
 from repopilot.providers import create_provider
 from repopilot.runtime.repository import prepare_repository
 from repopilot.trace import save_trace
+from repopilot.wizard import build_wizard_paths, write_case_file, write_provider_config
 
 app = typer.Typer(help="RepoPilot: turn repository issues into tested patches.")
 console = Console()
+
+PROVIDER_CHOICES = ("demo", "openai", "codex", "shell")
 
 
 def solve_issue(
@@ -131,6 +135,95 @@ def arena(
         html_report.parent.mkdir(parents=True, exist_ok=True)
         html_report.write_text(render_html_report(report), encoding="utf-8")
 
+    _print_arena_report(report)
+    console.print(f"Report: [cyan]{output}[/cyan]")
+    if markdown_report:
+        console.print(f"Markdown: [cyan]{markdown_report}[/cyan]")
+    if html_report:
+        console.print(f"HTML: [cyan]{html_report}[/cyan]")
+
+
+@app.command()
+def demo() -> None:
+    """Run the bundled deterministic demo."""
+    sample = Path("examples/sample_buggy_project")
+    issue = "The add(a, b) function returns the wrong result for positive numbers."
+    solve_issue(
+        str(sample),
+        issue=issue,
+        test="python -m pytest -q",
+        provider="demo",
+        output=Path(".repopilot/traces"),
+        patch_output=Path(".repopilot/demo.patch"),
+    )
+
+
+@app.command()
+def wizard(
+    output_dir: Path = typer.Option(Path(".repopilot/wizard"), "--output-dir", "-o"),
+) -> None:
+    """Run an interactive evaluation wizard."""
+    console.print(Panel.fit("[bold]RepoPilot Evaluation Wizard[/bold]"))
+    repo = Prompt.ask("Repository path or Git URL", default=".")
+    issue = Prompt.ask("Issue or task")
+    test_command = Prompt.ask("Verification command", default="python -m pytest -q")
+    provider_choice = Prompt.ask(
+        "Provider",
+        choices=list(PROVIDER_CHOICES),
+        default="demo",
+        show_choices=True,
+    )
+    custom_shell_command = None
+    if provider_choice == "shell":
+        custom_shell_command = Prompt.ask(
+            "Shell command",
+            default='my-agent --repo "{repo}" --issue {issue}',
+        )
+    timeout_seconds = IntPrompt.ask("Provider timeout seconds", default=240)
+    run_name = Prompt.ask("Run name", default="wizard-run")
+    open_hint = Confirm.ask("Print HTML report path when done", default=True)
+
+    paths = build_wizard_paths(output_dir, run_name)
+    case_id = paths.case_path.stem
+    write_case_file(
+        paths.case_path,
+        case_id=case_id,
+        repo=repo,
+        issue=issue,
+        test_command=test_command,
+        timeout_seconds=timeout_seconds,
+    )
+    write_provider_config(
+        paths.provider_config_path,
+        provider_choice=provider_choice,
+        custom_shell_command=custom_shell_command,
+    )
+
+    console.print(f"Case file: [cyan]{paths.case_path}[/cyan]")
+    console.print(f"Provider config: [cyan]{paths.provider_config_path}[/cyan]")
+    settings = Settings.from_env()
+    provider_specs = load_provider_config(paths.provider_config_path)
+    report = run_arena_with_specs(paths.case_path, provider_specs, settings)
+    paths.json_report_path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
+    paths.markdown_report_path.write_text(render_markdown_report(report), encoding="utf-8")
+    paths.html_report_path.write_text(render_html_report(report), encoding="utf-8")
+    _print_arena_report(report)
+
+    console.print(f"JSON: [cyan]{paths.json_report_path}[/cyan]")
+    console.print(f"Markdown: [cyan]{paths.markdown_report_path}[/cyan]")
+    if open_hint:
+        console.print(f"HTML: [cyan]{paths.html_report_path}[/cyan]")
+
+
+def _summarize_reasons(reasons: list[str]) -> str:
+    if not reasons:
+        return ""
+    if reasons == ["small focused patch"]:
+        return "focused"
+    return ", ".join(reasons[:2])
+
+
+def _print_arena_report(report) -> None:
     table = Table(title="AgentPatchBench Arena")
     table.add_column("Case")
     table.add_column("Provider")
@@ -166,35 +259,7 @@ def arena(
         console.print(
             f"Pass rate: [bold]{report.summary.pass_rate:.1%}[/bold] "
             f"({report.summary.passed}/{report.summary.total_runs})"
-    )
-    console.print(f"Report: [cyan]{output}[/cyan]")
-    if markdown_report:
-        console.print(f"Markdown: [cyan]{markdown_report}[/cyan]")
-    if html_report:
-        console.print(f"HTML: [cyan]{html_report}[/cyan]")
-
-
-@app.command()
-def demo() -> None:
-    """Run the bundled deterministic demo."""
-    sample = Path("examples/sample_buggy_project")
-    issue = "The add(a, b) function returns the wrong result for positive numbers."
-    solve_issue(
-        str(sample),
-        issue=issue,
-        test="python -m pytest -q",
-        provider="demo",
-        output=Path(".repopilot/traces"),
-        patch_output=Path(".repopilot/demo.patch"),
-    )
-
-
-def _summarize_reasons(reasons: list[str]) -> str:
-    if not reasons:
-        return ""
-    if reasons == ["small focused patch"]:
-        return "focused"
-    return ", ".join(reasons[:2])
+        )
 
 
 if __name__ == "__main__":
